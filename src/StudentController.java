@@ -25,15 +25,16 @@ public class StudentController implements HttpHandler {
         try {
             //this.httpExchange = httpExchange;
             // System.out.println(httpExchange.getRequestURI());
+                String uri = httpExchange.getRequestURI().toString();
 
-            if (httpExchange.getRequestURI().toString().equals("/students/add")) {
+            if (uri.equals("/students/add")) {
                 add(httpExchange);
-            } else if (httpExchange.getRequestURI().toString().equals("/students/delete/id")) {
-                id = 0;
-                delete(id);
-            } else if (httpExchange.getRequestURI().toString().equals("/students/edit/id")) {
-                id = 0;
-                edit(id);
+            } else if (isDelete(uri)) {
+                id = getIDfromUri(uri);
+                delete(id, httpExchange);
+            } else if (isEdit(uri)) {
+                id = getIDfromUri(uri);
+                edit(id, httpExchange);
             } else {
                 index(httpExchange);
             }
@@ -64,7 +65,7 @@ public class StudentController implements HttpHandler {
                     "</th>");
         }
 
-        responseBuilder.append("</table>" + "</body></html>");
+        responseBuilder.append("</table>" + "</form>" + "</body></html>");
         response = responseBuilder.toString();
 
         httpExchange.sendResponseHeaders(200, response.length());
@@ -89,7 +90,7 @@ public class StudentController implements HttpHandler {
                     "  Age:<br>\n" +
                     "  <input type=\"text\" name=\"age\" >\n" +
                     "  <br><br> \n" +
-                    "  <input type=\"submit\" value=\"Submit\">\n" +
+                    "  <input type=\"submit\" value=\"Submit\" >\n" +
                     "</form> " +
                     "</body></html>";
             httpExchange.sendResponseHeaders(200, response.length());
@@ -112,22 +113,75 @@ public class StudentController implements HttpHandler {
             br.close();
             isr.close();
 
-
-            System.out.println(httpExchange.getAttribute("Location"));
             String url = "/students";
             httpExchange.getResponseHeaders().set("Location", url);
             httpExchange.sendResponseHeaders(303, -1);
-            System.out.println(httpExchange.getResponseBody().toString());
-
 
         }
 
     }
 
-    private void edit(int id) {
+    private void edit(int id, HttpExchange httpExchange) throws IOException {
+        String response = "";
+        String method = httpExchange.getRequestMethod();
+        if (method.equals("GET")) {
+            response = "<html><body>" +
+                    "<form method=\"POST\">\n" +
+                    "  First name:<br>\n" +
+                    "  <input type=\"text\" name=\"firstname\" >\n" +
+                    "  <br>\n" +
+                    "  Last name:<br>\n" +
+                    "  <input type=\"text\" name=\"lastname\" >\n" +
+                    "  <br>\n" +
+                    "  Age:<br>\n" +
+                    "  <input type=\"text\" name=\"age\" >\n" +
+                    "  <br><br> \n" +
+                    "  <input type=\"submit\" value=\"Submit\" >\n" +
+                    "</form> " +
+                    "</body></html>";
+            httpExchange.sendResponseHeaders(200, response.length());
+            OutputStream os = httpExchange.getResponseBody();
+            os.write(response.getBytes());
+        }
+
+        if (method.equals("POST")) {
+            InputStreamReader isr = new InputStreamReader(httpExchange.getRequestBody(), "utf-8");
+            BufferedReader br = new BufferedReader(isr);
+            String formData = br.readLine();
+
+            Map inputs = parseFormData(formData);
+            int index = id;
+            String firstName = inputs.get("firstname").toString();
+            String lastName = inputs.get("lastname").toString();
+            int age = Integer.parseInt(inputs.get("age").toString());
+            for (Student student : studentList){
+                if (student.getId() == id){
+                    student.setFirstName(firstName);
+                    student.setLastName(lastName);
+                    student.setAge(age);
+
+                }
+            }
+            br.close();
+            isr.close();
+
+            String url = "/students";
+            httpExchange.getResponseHeaders().set("Location", url);
+            httpExchange.sendResponseHeaders(303, -1);
+
+        }
+
     }
 
-    private void delete(int id) {
+    private void delete(int id, HttpExchange httpExchange) throws IOException {
+        System.out.println("haw");
+        studentList.remove(id);
+
+        //refresh below
+        String url = "/students";
+        httpExchange.getResponseHeaders().set("Location", url);
+        httpExchange.sendResponseHeaders(303, -1);
+
     }
 
     /**
@@ -146,4 +200,40 @@ public class StudentController implements HttpHandler {
         return map;
     }
 
+
+    private static int getIDfromUri(String uri){
+        String[] arrUri = uri.split("/");
+        return Integer.parseInt(arrUri[3]);
+    }
+
+    private static boolean isDelete(String uri) {
+        String[] arrUri = uri.split("/");
+        if(arrUri.length==4) {
+            if (arrUri[1].equals("students") && arrUri[2].equals("delete") && isInteger(arrUri[3])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isEdit(String uri) {
+        String[] arrUri = uri.split("/");
+        if(arrUri.length==4) {
+            if (arrUri[1].equals("students") && arrUri[2].equals("edit") && isInteger(arrUri[3])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isInteger(String s) {
+        try {
+            Integer.parseInt(s);
+        } catch(NumberFormatException e) {
+            return false;
+        } catch(NullPointerException e) {
+            return false;
+        }
+        return true;
+    }
 }
